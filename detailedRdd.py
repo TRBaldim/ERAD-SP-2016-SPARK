@@ -5,7 +5,8 @@ Created on 02/07/2016
 '''
 
 from pyspark import SparkContext
-from plottinExemples import plotDates
+from datetime import datetime
+from graficos import plotData
 
 
 if __name__ == '__main__':
@@ -58,18 +59,18 @@ if __name__ == '__main__':
     
     ClimateRdd = sc.textFile(byCountry, use_unicode=False)
     
-    #print ClimateRdd.collect()[:10]
+    print ClimateRdd.collect()[:10]
     
     #Primeiro mapping do RDD, voltado para alterar o tipo de seralizacao. Criando varios elemntos por linha
     #Alterando os arquivos de string 'a, b, c' para arrays de strings ['a', 'b', 'c']
     ClimateRdd = ClimateRdd.map(lambda line: line.split(','))
     
-    #print ClimateRdd.collect()[:10]
+    print ClimateRdd.collect()[:10]
     
     #Retorna o primeiro elemento do RDD. Neste caso o Header
     header = ClimateRdd.first()
     
-    #print header
+    print header
     
     #Remove o header do RDD para nao afetar os resultados
     ClimateRdd = ClimateRdd.filter(lambda line: line != header)
@@ -105,7 +106,7 @@ if __name__ == '__main__':
     
     DateTempRdd = ClimateRdd.map(lambda x: (x[0], float(x[1]) if x[1] != '' else 0.0))
     
-    #print ClimateRdd.collect()[:10]
+    print ClimateRdd.collect()[:10]
     
     '''
     Com a estrutra de map reduce do Spark devemos tentar reduzir as datas para de acorodo com
@@ -116,7 +117,7 @@ if __name__ == '__main__':
     #como calcular a media?
     ClimateReduced = DateTempRdd.reduceByKey(lambda val, acc: val + acc)
     
-    #print ClimateReduced.collect()[:10]
+    print ClimateReduced.collect()[:10]
     
     
     '''
@@ -128,7 +129,7 @@ if __name__ == '__main__':
     #Neste caso estamos tendo uma estrutura de RDD que possui: (Data, (Temperatura, 1))
     DateTempRdd = ClimateRdd.map(lambda x: (x[0], (float(x[1] if x[1] != '' else 0.0), 1)))
     
-    #print DateTempRdd.collect()[:10]
+    print DateTempRdd.collect()[:10]
     
     '''
     Agora com a variavel auxiliar podemos fazer a contagem da media.
@@ -139,14 +140,14 @@ if __name__ == '__main__':
     #Assim estamos somando (1.1+2.1, 1+1)
     ClimateReduced = DateTempRdd.reduceByKey(lambda val, acc: (val[0] + acc[0], val[1] + acc[1]))
     
-    #print ClimateReduced.collect()[:10]
+    print ClimateReduced.collect()[:10]
     
     #Agora usamos o Map para fazer a media.
     #Nesse momento temos um elemento que possui este formato: (Date, (Sum_Temp, Sum_count))
     #Queremos um valor que seja: (Date, (Avg_Temp))
     CityByDate = ClimateReduced.map(lambda x: (x[0], x[1][0] / x[1][1]))
     
-    #print CityByDate.collect()[:10]
+    print CityByDate.collect()[:10]
     
     '''
     Apos o resultado final podemos ordenar o resultado por data.
@@ -155,7 +156,7 @@ if __name__ == '__main__':
     
     CityByDate = CityByDate.sortBy(lambda x: x[0])
     
-    #print CityByDate.collect()[:10]
+    print CityByDate.collect()[:10]
     
     '''
     Neste primeiro exemplo fizemos tudo passo a passo. Mas todas essas manipulacoes
@@ -169,7 +170,14 @@ if __name__ == '__main__':
                             .map(lambda x: (x[0], x[1][0] / x[1][1])) \
                             .sortBy(lambda x: x[0])
     
-    #print CityByDate.collect()[:10]
+    print CityByDate.collect()[:10]
+    
+    #Podemos converter Keys ou Values para objetos, tanto nativos Python como datetime como objetos proprios.                        
+    convertedeDate = CityByDate.map(lambda x: (datetime.strptime(x[0], '%Y-%m-%d'), x[1]))
+    
+    print convertedeDate.collect()[:10]
+    
+    plotData(convertedeDate.collect())
     
     
     '''
@@ -177,10 +185,10 @@ if __name__ == '__main__':
     Que podem ajudar muito na vida do desenvolvedor, ou do cientista de dados para informacoes estatisticas
     '''
     #Contagem de elementos RDD
-    #print CityByDate.count()
+    print CityByDate.count()
     
     #Contagem do numero de cada elemento para cada key Retorno (Key, Count)
-    #print ClimateRdd.countByKey().items()
+    print ClimateRdd.countByKey().items()
     
     '''
     Voce podera verificar que o comando:
@@ -195,22 +203,87 @@ if __name__ == '__main__':
     '''
     
     #Contagem do numero de cada elemento para cada Valor. Retorno ((Key, Value), Count)
-    #print ClimateRdd.map(lambda x: (x[0], (x[1], x[2], x[3]))).countByValue().items()[:10]
+    print ClimateRdd.map(lambda x: (x[0], (x[1], x[2], x[3]))).countByValue().items()[:10]
     
     #Retorno de Elementos Distintos
-    #print CityByDate.distinct().collect()[:10]
+    print CityByDate.distinct().collect()[:10]
     
     #Retorna um sample do RDD, em geral para testes.
     #sample(withReplacement, fraction, seed)
     #withReplacement: pode ter elementos repetidos caso verdadeiro
     #fraction: fracao dos dados a serem pegos
     #seed: semente para a randomizacao
-    #print CityByDate.sample(False, 0.1, 42)
+    print CityByDate.sample(False, 0.1, 42)
     
-    test = plotDates()
-    test.addData(CityByDate.collect())
+    globalRdd = sc.textFile(byGlobal, use_unicode=False)
+        
+    header = globalRdd.first()
     
+    globalRdd = globalRdd.filter(lambda x: x != header) \
+                         .map(lambda x: x.split(',')) \
+                         .map(lambda x: (x[0], float(x[1]) if x[1] != '' else 0.0)) \
+                         .sortBy(lambda x: x[0])
     
-                         
+    convertedeDate = globalRdd.map(lambda x: (datetime.strptime(x[0], '%Y-%m-%d'), x[1]))
     
+    plotData(convertedeDate.collect())
     
+    '''
+    Para questoes comparativas podemos tentar fazer um join entre os dois arquivos para tentar gerar um novo RDD
+    Esta estrutura sera uma forma de tentarmos comparar os dados dentro do mesmo dataSet criado por nos.
+    No processo usaremos a funcao join() do spark.
+    '''
+    
+    #Usamos a funcao join que ira unir os Values dos dois RDDs caso haja a mesma key.
+    #join([('a', 1) ('b', 2)] [('a', 3), ('c', 1)])
+    #Resultado: [('a', (1, 3))]
+    #Os outros resultados sao excluidos
+    globalVsCities = globalRdd.join(CityByDate) \
+                              .sortBy(lambda x: x[0])
+    
+    print globalVsCities.collect()[:10]
+    
+    '''
+    Os modelos RDD permitem operacoes diretamente dentro de cada linha
+    Aplicando funcoes definidas pelo desenvolvedor, vamos aplicar uma funcao que
+    retorna None para diferenca entre as temperaturas menor que 5.
+    '''
+    
+    def checkTemp(elem):
+        
+        modulo = lambda x: x if x > 0 else -x
+        temp = elem[1]
+        
+        if modulo(temp[0]-temp[1]) > 5:
+            return elem
+        else:
+            return None
+    
+    tempDeviations = globalVsCities.map(checkTemp)
+    
+    print tempDeviations.collect()
+    
+    '''
+    Como foi possivel ver, temos uma alteracao no dado, nem todos os elementos
+    possuem o mesmo tipo de objeto, agora temos o None dentro do nosso RDD.
+    Logo temos que remover os None de nosso RDD.
+    ''' 
+    
+    tempDeviations = tempDeviations.filter(lambda x: x != None)
+    
+    print tempDeviations.collect()
+    
+    print [globalRdd.count(), tempDeviations.count()]
+    
+    '''
+    Agora como saber qual a temperatura que tem maior diferenca?
+    Vamos fazer um pequeno codigo que nos dira isso para finalizar nossa primeira parte
+    de manipulacao de dados com o Spark
+    '''
+    modulo = lambda x: x if x > 0 else -x
+    resultado = tempDeviations.map(lambda x: (1, (x[0], x[1][0], x[1][1])) if x[1][0] != 0.0 and x[1][1] != 0.0 else None) \
+                              .filter(lambda x: x != None) \
+                              .reduceByKey(lambda acc, val: acc if modulo(acc[1] - acc[2]) > modulo(val[1] - val[2]) else val) \
+                              .map(lambda x: x[1]) \
+                              .collect()
+    print resultado
